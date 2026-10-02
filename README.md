@@ -2,6 +2,8 @@
 
 **SIGGRAPH Asia 2026 Technical Communications**
 
+Please check the full paper at [arXiv](https://arxiv.org/abs/2609.11434).
+
 TODO: README.md to be updated with latest information.
 
 ## Repository structure
@@ -69,10 +71,17 @@ bash scripts/run_grayscale.sh dragon
 ## Citation
 
 ```bibtex
-@misc{cvqpg,
-  title  = {Complex-Valued Quadratic Phase Gaussians for Computer-Generated Holography},
-  author = {TODO},
-  year   = {2026},
-  note   = {TODO: venue}
+@inproceedings{wang2026hologram,
+      author = {Wang, Haolong and Zhan, Yicheng and Ak{\c{s}}it, Kaan and Qiu, Simeng},
+      title = {Hologram Representation via Quadratic Phase Gaussian Splatting},
+      booktitle = {SIGGRAPH Asia 2026 Technical Communications (SA Technical Communications '26)},
+      year = {2026},
+      month = {December 01--04},
+      publisher = {Association for Computing Machinery},
+      location = {Kuala Lumpur, Malaysia},
+      pages = {4},
+      isbn = {979-8-4007-2841-9/2026/12},
+      doi = {10.1145/3829339.3847858},
+      url = {https://arxiv.org/abs/2609.11434}
 }
 ```
