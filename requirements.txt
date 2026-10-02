@@ -1,0 +1,14 @@
+# Tested with Python 3.11, torch 2.8.0 + CUDA 12.8, torchvision 0.23.0.
+torch>=2.1
+torchvision
+odak==0.2.7
+lpips==0.1.4
+pytorch-msssim==1.0.0
+scikit-image>=0.21
+numpy
+pillow
+imageio
+matplotlib>=3.6
+tqdm
+flip-evaluator==1.7
+cvvdp==0.5.6

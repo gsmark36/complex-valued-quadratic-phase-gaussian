@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+results/*
+!results/.gitkeep
+*.pth
+.ipynb_checkpoints/
+.vscode/
+.idea/
+odak.log
