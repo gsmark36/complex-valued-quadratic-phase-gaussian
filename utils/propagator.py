@@ -1,4 +1,4 @@
-# Light propagation and multi-plane loss, adapted from odak (https://github.com/kaanaksit/odak, MPL-2.0).
+# Light propagation and multi-plane loss, adapted from odak (https://github.com/kaanaksit/odak).
 # Pure-PyTorch band-limited angular spectrum method (BL-ASM); no custom CUDA kernels are required.
 import torch
 import logging

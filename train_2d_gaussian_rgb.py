@@ -18,7 +18,8 @@ from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 from model_2d_gaussian_rgb import Gaussians2D, Scene2D, make_trainable_2d
 from utils import set_seed, GaussianLoss, Adan, propagator, console_only_print, multiplane_loss, visualize_gaussian_positions
 
-log_debug = True  # redirect stdout to <result_dir>/log.txt (progress bar stays on the console)
+
+log_debug = True  # redirect stdout to <result_dir>/log.txt
 logging.getLogger('odak').setLevel(logging.WARNING)  # silence per-image save messages
 
 
@@ -48,14 +49,14 @@ def load_depth_image(depth_path, img_size):
 
 
 def calculate_psnr(pred, target):
-    """Calculate PSNR between prediction and target tensors."""
+    """PSNR between prediction and target tensors"""
     pred_np = pred.detach().cpu().numpy()
     target_np = target.detach().cpu().numpy()
     return peak_signal_noise_ratio(target_np, pred_np)
 
 
 class MeansCosineScheduler:
-    """Cosine-anneal the learning rate of the 'means' parameter group only; other groups keep a constant LR."""
+    """Cosine-anneal the learning rate of the 'means' parameter group only"""
     def __init__(self, optimizer, num_itrs, eta_min=1e-3):
         self.optimizer = optimizer
         self.group_indices = [i for i, g in enumerate(optimizer.param_groups) if g.get("name") == "means"]
@@ -70,7 +71,7 @@ class MeansCosineScheduler:
 
 
 def setup_optimizer(gaussians, num_itrs, lr=0.01):
-    """Adan with per-parameter-group learning rates; only the means are cosine-annealed."""
+    """Adan with per-parameter-group learning rates"""
     param_groups = [
         {'params': [gaussians.means_2d], 'lr': lr, 'name': 'means'},
         {'params': [gaussians.pre_act_scales], 'lr': 0.005, 'name': 'scales'},
@@ -86,7 +87,7 @@ def setup_optimizer(gaussians, num_itrs, lr=0.01):
 
 
 def reconstruct(scene, propagator, img_size):
-    """Render the hologram and propagate it to every depth plane -> intensities [planes, C, pH, pW]"""
+    """Render the hologram and propagate it to every depth plane, get intensities [planes, C, pH, pW]"""
     hologram_complex = scene.render(img_size)
     phase_map = odak.learn.wave.calculate_phase(hologram_complex) % (2 * odak.pi)
     amplitude = torch.clamp(odak.learn.wave.calculate_amplitude(hologram_complex), min=0.0, max=1.0)
@@ -95,7 +96,7 @@ def reconstruct(scene, propagator, img_size):
 
 
 def evaluate(recons, targets, H, W, lpips_fn, cvvdp_metric):
-    """PSNR / SSIM / LPIPS / FLIP / CVVDP for every supervised plane."""
+    """PSNR / SSIM / LPIPS / FLIP / CVVDP for every supervised plane"""
     metrics = {k: [] for k in ["psnr", "ssim", "lpips", "flip", "cvvdp"]}
     for plane_idx in range(min(len(recons), len(targets))):
         recon = torch.clamp(recons[plane_idx], min=0.0, max=1.0)
@@ -107,7 +108,7 @@ def evaluate(recons, targets, H, W, lpips_fn, cvvdp_metric):
         metrics["psnr"].append(float(peak_signal_noise_ratio(target_np, recon_np, data_range=1.0)))
         metrics["ssim"].append(float(structural_similarity(target_np, recon_np, data_range=1.0, channel_axis=2)))
 
-        # LPIPS expects [-1, 1]
+        # LPIPS: input range [-1, 1]
         metrics["lpips"].append(lpips_fn(2 * recon.unsqueeze(0) - 1, 2 * target.unsqueeze(0) - 1).item())
 
         # FLIP: HxWx3 numpy in [0, 1], LDR (reference, test)
@@ -116,7 +117,7 @@ def evaluate(recons, targets, H, W, lpips_fn, cvvdp_metric):
         _, flip_val, _ = flip.evaluate(target_rgb, recon_rgb, "LDR")
         metrics["flip"].append(float(flip_val))
 
-        # CVVDP: 3-channel [0, 1] image, single frame
+        # CVVDP: 3-channel image in [0, 1], single frame
         jod, _ = cvvdp_metric.predict(recon, target, dim_order="CHW", frames_per_second=0)
         metrics["cvvdp"].append(float(jod))
     return metrics
@@ -135,19 +136,18 @@ def run_training_2d(args, args_prop, propagator, result_dir, checkpoint_dir, dev
         depth_image = load_depth_image(args.depth_path, img_size).to(device)
     else:
         if args_prop.num_planes > 1:
-            raise ValueError("A depth map (--depth_path) is required for more than one plane; use --num_planes 1 otherwise.")
+            raise ValueError("A depth map (--depth_path) is required for more than one plane.")
         depth_image = torch.ones((1, H, W), device=device)
-        print("No depth map: single plane")
+        print("No depth map: single plane with default depth (all ones)")
 
     gaussians = Gaussians2D(num_points=args.num_gaussians, img_size=img_size, device=device, args_prop=args_prop)
     scene = Scene2D(gaussians, args_prop)
     make_trainable_2d(gaussians)
 
-    # Warm-start: freeze curvature (=> behaves as a flat-phase model) for the first
-    # `warmup_iters` steps, so the model converges as flat and then refines curvature as a
-    # residual. 'flat' primitive = curvature frozen at 0 forever: exact plane-phase baseline
-    # through the very same rendering/propagation code path (tanh(0)=0 -> quadratic phase == 0).
-    gaussians.curv_mode = args.curv_mode
+    # Curvature warm-up
+    # Warm-up stage: freeze curvature to zero for all primitives (planar Gaussians)
+    # Refinement stage: unlock curvature to optimize high-frequency details
+    gaussians.curv_mode = 'off' if args.primitive == 'flat' else args.curv_mode
     if args.primitive == 'flat':
         gaussians.curvature.requires_grad_(False)
         curv_warmup_active = False
@@ -166,7 +166,7 @@ def run_training_2d(args, args_prop, propagator, result_dir, checkpoint_dir, dev
         total_params -= gaussians.curvature.numel()
     print(f"Total trainable parameters: {total_params:,}")
 
-    # Per-plane targets (defocus-blurred by depth)
+    # Synthesized multi-plane targets (defocus-blurred by depth)
     targets, loss_function, mask = multiplane_loss(target_image=target_image, target_depth=depth_image, args_prop=args_prop)
     for idx, target in enumerate(targets):
         odak.learn.tools.save_image(f"{result_dir}/target_{idx}.png", target, cmin=0., cmax=1.0)
@@ -177,12 +177,12 @@ def run_training_2d(args, args_prop, propagator, result_dir, checkpoint_dir, dev
     start_time = time.time()
     pbar = tqdm(range(args.num_itrs), desc='Training 2D Gaussians (RGB)', miniters=100)
     for itr in pbar:
-        # Warm-start: unfreeze curvature once warmup is over (residual refinement on top of flat).
+        # Unlock curvature once warm-up stage is over
         if curv_warmup_active and itr == args.warmup_iters:
             gaussians.curvature.requires_grad_(True)
             curv_warmup_active = False
             with console_only_print():
-                print(f"[warm-start] curvature unfrozen at iter {itr}")
+                print(f"[warm-up] curvature unfrozen at iter {itr}")
 
         optimizer.zero_grad()
 
@@ -215,7 +215,7 @@ def run_training_2d(args, args_prop, propagator, result_dir, checkpoint_dir, dev
             pbar.set_postfix({
                 'Loss': f'{sum(running_losses[-50:]) / min(len(running_losses), 50):.6f}',
                 'PSNR': f'{sum(running_psnrs[-50:]) / min(len(running_psnrs), 50):.2f}',
-                'SSIM': f'{sum(running_ssim_losses[-50:]) / min(len(running_ssim_losses), 50):.6f}',
+                'SSIM_loss': f'{sum(running_ssim_losses[-50:]) / min(len(running_ssim_losses), 50):.6f}',
                 'LR': f'{current_lr:.2e}',
                 'G': f'{len(gaussians)}',
             })
@@ -227,8 +227,7 @@ def run_training_2d(args, args_prop, propagator, result_dir, checkpoint_dir, dev
                 for plane_idx in range(min(args_prop.num_planes, len(reconstruction_intensities))):
                     recon = torch.clamp(reconstruction_intensities[plane_idx], min=0.0, max=1.0)
                     recon = odak.learn.tools.crop_center(recon, size=(H, W))
-                    plane_suffix = f"_{plane_idx+1}" if args_prop.num_planes > 1 else ""
-                    odak.learn.tools.save_image(f"{result_dir}/recon_{itr:06d}{plane_suffix}.png", recon, cmin=0., cmax=1.0)
+                    odak.learn.tools.save_image(f"{result_dir}/recon_{itr:06d}_{plane_idx}.png", recon, cmin=0., cmax=1.0)
                 phase_cropped = odak.learn.tools.crop_center(phase_map.squeeze(0), size=(H, W))
                 amp_cropped = odak.learn.tools.crop_center(amplitude.squeeze(0), size=(H, W))
                 odak.learn.tools.save_image(f"{result_dir}/phase_{itr:06d}.png", phase_cropped, cmin=0., cmax=2 * odak.pi)
@@ -248,7 +247,7 @@ def run_training_2d(args, args_prop, propagator, result_dir, checkpoint_dir, dev
                 print("Mean: " + ", ".join(f"{k.upper()}: {means[k]:.6f}" for k in means))
                 print(f"Current LR: {current_lr:.2e}")
 
-                # Save model (best by PSNR of the primary plane)
+                # Save model (best by PSNR of primary plane)
                 primary_plane_idx = min(1, args_prop.num_planes - 1)
                 primary_psnr = metrics["psnr"][primary_plane_idx] if len(metrics["psnr"]) > primary_plane_idx else metrics["psnr"][0]
                 if primary_psnr > best_psnr:
@@ -274,54 +273,52 @@ def run_training_2d(args, args_prop, propagator, result_dir, checkpoint_dir, dev
 
 
 def get_args():
-    parser = argparse.ArgumentParser(description="Curved (quadratic-phase) 2D Gaussian CGH, RGB pipeline")
+    parser = argparse.ArgumentParser(description="Complex-Valued Quadratic Phase Gaussian, RGB pipeline")
     # Data / output
-    parser.add_argument("--target_image_path", default="./data/flower.png", type=str, help="Target image to overfit")
+    parser.add_argument("--target_image_path", default="./data/flower.png", type=str, help="Target image")
     parser.add_argument("--depth_path", default="./data/flower_depth.png", type=str,
-                        help="Depth map in [0,255] (near=0). Pass '' for a single-plane target without depth")
+                        help="Depth map in [0,255], pass '' for a single-plane target without depth")
     parser.add_argument("--result_base", default="./results", type=str, help="Base output directory")
-    parser.add_argument("--tag", default="", type=str, help="Run folder name under result_base (default: <image>_rgb_<primitive>)")
+    parser.add_argument("--tag", default="", type=str, help="Folder name under result_base (default: <image>_rgb_<primitive>)")
     # Representation
     parser.add_argument("--img_size", nargs=2, default=[640, 480], type=int, help="Target resolution W H")
     parser.add_argument("--compression_ratio", default=0.2, type=float,
-                        help="N = H*W/2 * ratio Gaussians (640x480, 0.2 -> 30720)")
+                        help="Gaussian number N = H*W/2 * ratio (640x480, 0.2 -> 30720)")
     parser.add_argument("--num_gaussians", default=None, type=int, help="Explicit Gaussian count (overrides compression_ratio)")
     parser.add_argument("--primitive", default="curv", type=str, choices=["flat", "curv"],
-                        help="'flat' = plane-phase baseline (curvature frozen at 0, identical pipeline); "
-                             "'curv' = quadratic-phase Gaussian")
-    parser.add_argument("--curv_mode", default="scale_aware", type=str, choices=["scale_aware", "global"],
-                        help="Curvature bound: 'scale_aware' (per-Gaussian Nyquist, ours) or 'global' (200*tanh, ablation)")
+                        help="'flat' = flat-phase baseline, 'curv' = CVQPG")
+    parser.add_argument("--curv_mode", default="scale_aware", type=str, choices=["scale_aware", "constant"],
+                        help="Curvature bound: 'scale_aware' (per-Gaussian Nyquist) or 'constant' (200*tanh)")
     parser.add_argument("--curv_nyquist", default=0.9, type=float,
-                        help="scale_aware: fraction of the per-Gaussian 3-sigma Nyquist limit used as the curvature bound")
+                        help="Fraction of the per-Gaussian 3-sigma Nyquist limit")
     parser.add_argument("--warmup_iters", default=400, type=int,
-                        help="Freeze curvature for the first N iters (flat warm-start), then refine it as a residual")
+                        help="Number of warm-up iterations")
     parser.add_argument("--phase_iso", default=0, type=int,
-                        help="Ablation: 1 = isotropic quadratic phase 0.5*c*r^2 instead of the Mahalanobis form")
+                        help="Enable isotropic/standard quadratic phase factor for ablation study")
     # Optimization
     parser.add_argument("--num_itrs", default=2001, type=int, help="Number of training iterations")
     parser.add_argument("--lr", default=0.01, type=float, help="Learning rate of the Gaussian means")
-    parser.add_argument("--eval_freq", default=500, type=int, help="Evaluate (and checkpoint) every N iters")
-    parser.add_argument("--viz_freq", default=1000, type=int, help="Save reconstructions every N iters (<=0 disables)")
-    parser.add_argument("--seed", default=100, type=int)
+    parser.add_argument("--eval_freq", default=500, type=int, help="Evaluation and checkpoint interval")
+    parser.add_argument("--viz_freq", default=1000, type=int, help="Results saving interval (0 = disabled)")
+    parser.add_argument("--seed", default=100, type=int, help="Random seed")
     # Optics
-    parser.add_argument("--wavelengths", nargs=3, default=[639e-9, 532e-9, 473e-9], type=float, help="R G B wavelengths (m)")
+    parser.add_argument("--wavelengths", nargs=3, default=[639e-9, 532e-9, 473e-9], type=float, help="R, G, B wavelengths (m)")
     parser.add_argument("--pixel_pitch", default=3.74e-6, type=float, help="SLM pixel pitch (m)")
     parser.add_argument("--num_planes", default=2, type=int, help="Number of supervised depth planes")
     parser.add_argument("--d_val", default=3e-3, type=float, help="Propagation distance to the center of the volume (m)")
     parser.add_argument("--volume_depth", default=4e-3, type=float, help="Depth span of the multi-plane stack (m)")
     parser.add_argument("--split_ratio", default=1.0, type=float, help="Depth exponent used when splitting into 2 planes")
     parser.add_argument("--pad_size", nargs=2, default=None, type=int,
-                        help="Padded size pH pW for propagation. Default: >=144 px guard per side, rounded up to /64 "
-                             "(640x480 -> 768 960)")
+                        help="Padded size pH pW for propagation")
     parser.add_argument("--aperture_size", default=0, type=int,
-                        help="Fourier aperture radius (px on the 2x grid). 0 = disabled; -1 = sum(img_size)/1.4; >0 = explicit")
+                        help="Fourier aperture radius in px (0 = disabled, -1 = sum(img_size)/1.4, >0 = explicit radius in px)")
     # Performance
     parser.add_argument("--tile_size", default=64, type=int, help="Renderer tile size in px")
     parser.add_argument("--gauss_batch", default=1024, type=int, help="Gaussians per renderer batch")
     parser.add_argument("--grad_ckpt", default=0, type=int,
-                        help="1 = gradient checkpointing in the renderer (identical results; RGB 640x480: 18 GB -> 1 GB, ~20%% slower)")
-    parser.add_argument("--tf32", default=1, type=int, help="1 = allow TF32 matmul on Ampere+ GPUs; 0 = strict float32")
-    parser.add_argument("--device", default="cuda", type=str, choices=["cuda", "cpu"])
+                        help="Enable gradient checkpointing in the renderer for memory savings")
+    parser.add_argument("--tf32", default=1, type=int, help="Enable TF32 matmul on Ampere+ GPUs (0 = float32)")
+    parser.add_argument("--device", default="cuda", type=str, choices=["cuda", "cpu"], help="Training device")
     return parser.parse_args()
 
 
@@ -338,13 +335,11 @@ if __name__ == "__main__":
         pixel_pitch=args.pixel_pitch,
         volume_depth=args.volume_depth,
         d_val=args.d_val,
-        # Guard band: >=144 px per side (covers the propagation spill at a few mm + taper margin),
-        # rounded up to a multiple of 64. 640x480 -> [768, 960].
+        # Guard band >= 144 px per side, rounded up to a multiple of 64
         pad_size=(list(args.pad_size) if args.pad_size is not None
                   else [((args.img_size[1] + 2 * 144 + 63) // 64) * 64,
                         ((args.img_size[0] + 2 * 144 + 63) // 64) * 64]),
-        # aperture_size is a RADIUS on the 2x-resolution Fourier grid; 0 disables it by making
-        # the mask cover the whole grid.
+        # aperture_size is a radius on the 2x Fourier grid, 0 disables it by masking the whole grid
         aperture_size=(int(sum(args.img_size) / 1.4) if args.aperture_size < 0
                        else (10 * max(args.img_size) if args.aperture_size == 0
                              else args.aperture_size)),
@@ -358,7 +353,7 @@ if __name__ == "__main__":
     )
     device = torch.device(args.device if (args.device == "cuda" and torch.cuda.is_available()) else "cpu")
 
-    # Plane distances: centered on d_val and spanning volume_depth
+    # Plane distances, centered on d_val and spanning volume_depth
     if args_prop.num_planes > 1:
         args_prop.distances = torch.linspace(-args_prop.volume_depth / 2., args_prop.volume_depth / 2., args_prop.num_planes) + args_prop.d_val
     else:

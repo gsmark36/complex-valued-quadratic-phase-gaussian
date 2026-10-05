@@ -8,13 +8,6 @@ from torch.utils.checkpoint import checkpoint
 
 
 class Gaussians2D(torch.nn.Module):
-    """
-    Complex-valued 2D Gaussians on the hologram (SLM) plane, grayscale (single-wavelength) version.
-
-    Each primitive carries an anisotropic Gaussian footprint, an amplitude (`colours`) and phase,
-    an opacity, and a learnable curvature c (1/m) that adds the quadratic phase
-    k * 0.5 * c * r^2 across the footprint. curv_mode='off' gives the flat (constant-phase) baseline.
-    """
     def __init__(self, num_points: int, img_size: Tuple[int, int], device: str, args_prop: Namespace):
         super(Gaussians2D, self).__init__()
 
@@ -32,10 +25,11 @@ class Gaussians2D(torch.nn.Module):
         self.register_parameter('pre_act_opacities', torch.nn.Parameter(data["pre_act_opacities"], requires_grad=False))
         self.register_parameter('curvature', torch.nn.Parameter(data["curvature"], requires_grad=False))
 
-        # Curvature bound (see apply_activations).
-        self.curv_nyquist_frac = getattr(args_prop, 'curv_nyquist', 0.9)  # fraction of the per-Gaussian 3-sigma Nyquist limit
-        self.curv_mode = 'scale_aware'   # 'off' (flat) | 'scale_aware' (ours) | 'global' (single 200*tanh bound, for ablation)
-        self.curv_global_max = 200.0     # bound used by 'global' mode
+        # Curvature bound for activation
+        # Ablation: Constant curvature bound vs scale-aware curvature bound
+        self.curv_nyquist_frac = getattr(args_prop, 'curv_nyquist', 0.9)
+        self.curv_mode = 'scale_aware'   # 'off' | 'scale_aware' | 'constant' (ablation)
+        self.curv_const_max = 200.0      # 200*tanh bound used by 'constant' mode
 
         # Optimization caches
         self._activation_cache = None
@@ -53,13 +47,13 @@ class Gaussians2D(torch.nn.Module):
         data["means_2d"][:, 0] = data["means_2d"][:, 0] * W
         data["means_2d"][:, 1] = data["means_2d"][:, 1] * H
 
-        # Convert to tanh space for better optimization stability
         normalized_means = data["means_2d"].clone()
         normalized_means[:, 0] = (normalized_means[:, 0] / W) * 2 - 1  # Convert to [-1, 1]
         normalized_means[:, 1] = (normalized_means[:, 1] / H) * 2 - 1
         normalized_means = torch.clamp(normalized_means, -0.999, 0.999)
         data["means_2d"] = torch.atanh(normalized_means)
 
+        # Initialize colors
         data["colours"] = torch.rand((num_points, 1), dtype=torch.float32)
 
         # Initialize scales with minimum size to prevent dot artifacts
@@ -70,11 +64,12 @@ class Gaussians2D(torch.nn.Module):
             torch.rand((num_points, 2), dtype=torch.float32) * scale_range + min_init_scale
         )
 
+        # Initialize rotation / phase / opacities
         data["pre_act_rotation"] = torch.rand((num_points,), dtype=torch.float32) * 2 * np.pi - np.pi
         data["pre_act_phase"] = torch.zeros((num_points, 1), dtype=torch.float32)
         data["pre_act_opacities"] = torch.zeros((num_points,), dtype=torch.float32) - 0.5  # sigmoid -> ~0.38
 
-        # Curvature starts at 0 (= flat primitive)
+        # Initialize curvature at 0 (planar Gaussians)
         data["curvature"] = torch.zeros((num_points,), dtype=torch.float32)
 
         print(f"Initialized {num_points} 2D Gaussians for image size {img_size}")
@@ -82,12 +77,10 @@ class Gaussians2D(torch.nn.Module):
         return data
 
     def invalidate_cache(self):
-        """Call this when parameters are updated during training"""
         self._cache_dirty = True
         self._covariance_cache = None
 
     def apply_activations(self):
-        # Position activation with tanh constraint
         means_tanh = torch.tanh(self.means_2d)  # Constrain to (-1, 1)
         means_2d = torch.zeros_like(means_tanh)
         means_2d[:, 0] = (means_tanh[:, 0] + 1) * 0.5 * self.img_size[0]  # Scale to [0, W]
@@ -99,19 +92,16 @@ class Gaussians2D(torch.nn.Module):
         phase = self.pre_act_phase % (2.0 * np.pi)
         opacities = torch.sigmoid(self.pre_act_opacities)
 
-        # Curvature activation (reciprocal focal length, 1/m).
-        # The quadratic phase across a Gaussian is phi(r) = k * 0.5 * curvature * r_phys^2,
-        # so the local fringe frequency at the 3-sigma edge is curvature * 3*sigma*dxy / lambda.
-        # Nyquist (<0.5 cyc/px) gives the per-Gaussian bound curvature < lambda / (6 * sigma * dxy^2).
-        lam = float(self.args_prop.wavelengths[0])
+        # Curvature activation (check paper for details)
+        wavelength = float(self.args_prop.wavelengths[0])
         dxy = float(self.args_prop.pixel_pitch)
-        sigma = scales.max(dim=1).values                 # worst-case axis: edge fringe freq scales with the larger sigma
+        sigma = scales.max(dim=1).values
         if self.curv_mode == 'off':
             curvature = torch.zeros_like(self.curvature)
-        elif self.curv_mode == 'global':
-            curvature = self.curv_global_max * torch.tanh(self.curvature)
+        elif self.curv_mode == 'constant':
+            curvature = self.curv_const_max * torch.tanh(self.curvature)
         elif self.curv_mode == 'scale_aware':
-            c_max = self.curv_nyquist_frac * lam / (6.0 * sigma * (dxy ** 2) + 1e-20)
+            c_max = self.curv_nyquist_frac * wavelength / (6.0 * sigma * (dxy ** 2) + 1e-20)
             curvature = c_max * torch.tanh(self.curvature)
         else:
             raise ValueError(f"Unknown curv_mode: {self.curv_mode}")
@@ -123,7 +113,7 @@ class Gaussians2D(torch.nn.Module):
 
     @staticmethod
     def invert_cov_2D(cov_00, cov_01, cov_11):
-        """2x2 inversion of the covariance matrices"""
+        """Optimized 2x2 matrix inversion for covariance matrices"""
         det = cov_00 * cov_11 - cov_01 * cov_01
         det = det.clamp(min=1e-10)  # Numerical stability
         inv_det = 1.0 / det
@@ -135,7 +125,7 @@ class Gaussians2D(torch.nn.Module):
         return inv_00, inv_01, inv_11
 
     def compute_2d_covariance_elements(self, scales, rotation):
-        """Covariance R * S^2 * R^T, returned as its three unique elements"""
+        """Optimized 2D covariance computation"""
         if (self._covariance_cache is not None and
             not self._cache_dirty and
             self._covariance_cache['scales'].shape == scales.shape):
@@ -195,9 +185,9 @@ class Gaussians2D(torch.nn.Module):
 
 def soft_window_pad(hologram: torch.Tensor, pad_size: list) -> torch.Tensor:
     """
-    Pad the hologram to `pad_size` for propagation: the guard band is filled by replicating
-    the edge pixels (no gradient) and tapered to zero with a raised cosine, which suppresses
-    ringing from the hard content boundary. The content region itself is untouched.
+    This function implements a Tukey window (cosine-tapered window) to pad a field with a
+    smooth transition from the content edge to zero, avoiding sharp edges
+    Check Odak 0.2.8 (odak.learn.tools.matrix.smooth_pad) for similar implementation
     """
     C, H, W = hologram.shape
     pH, pW  = pad_size[0], pad_size[1]
@@ -257,15 +247,15 @@ class Scene2D:
         self.args_prop = args_prop
         self.device = gaussians.device
         self.wavelengths = torch.tensor(args_prop.wavelengths, dtype=torch.float32, device=self.device)
-        # Renderer batching knobs (larger = fewer Python-loop iterations, more peak memory;
-        # math is identical up to float summation order).
+        
+        # Renderer batching knobs (larger -> fewer Python-loop iterations, more peak memory)
         self.tile_size = getattr(args_prop, 'tile_size', 64)
         self.gauss_batch = getattr(args_prop, 'gauss_batch', 1024)
-        # Ablation: isotropic quadratic phase 0.5*c*r^2 instead of the Mahalanobis
-        # (footprint-following) form. Default False = the full model.
+        
+        # Ablation: isotropic/standard QPF vs Mahalanobis QPF
         self.phase_iso = getattr(args_prop, 'phase_iso', False)
-        # Gradient checkpointing of the per-tile render body: training memory drops from
-        # O(gaussian-pixel pairs) to O(one tile) at the cost of one extra forward in backward.
+        
+        # Gradient checkpointing of the per-tile render body
         self.grad_ckpt = getattr(args_prop, 'grad_ckpt', False)
 
     def evaluate_gaussians_2d_optimized(self, points_2d, means_2d, inv_00, inv_01, inv_11):
@@ -303,7 +293,7 @@ class Scene2D:
     def _render_tile_body(self, x0, y0, x1, y1, k, dxy2,
                           means_2d, inv_00, inv_01, inv_11, opacities,
                           complex_features, curvature, scales, radius, tile_diag_half):
-        """One tile's complex contribution, flattened to [1, P]."""
+        """Complex contribution of one tile, flattened to [1, P]"""
         device = self.device
         C = len(self.wavelengths)
 
@@ -356,11 +346,11 @@ class Scene2D:
             alphas = b_opac * gauss_vals  # [B, P]
 
             if self.phase_iso:
-                # Ablation: standard isotropic quadratic phase 0.5*c*r_phys^2
+                # Isotropic/standard QPF
                 d = pts - b_means.unsqueeze(1)                                          # [B, P, 2]
                 base_phase = 0.5 * b_curvature * (d * d).sum(-1) * dxy2                 # [B, P]
             else:
-                # Full model: Mahalanobis (footprint-following) quadratic phase
+                # Mahalanobis QPF
                 b_area = (b_scales[:, 0] * b_scales[:, 1]).abs().unsqueeze(1)           # [B, 1]
                 base_phase = 0.5 * b_curvature * mahal_dist * b_area * dxy2             # [B, P]
 
@@ -372,7 +362,7 @@ class Scene2D:
         return tile_hologram_flat
 
     def render_hologram_direct(self, img_size: Tuple[int, int]):
-        """Render the complex hologram with tile-based spatial culling, then pad it for propagation."""
+        """Render the complex hologram with tile-based spatial culling, then pad it for propagation"""
         W, H = img_size
         device = self.device
         C = len(self.wavelengths)
@@ -385,13 +375,14 @@ class Scene2D:
         cov_00, cov_01, cov_11 = self.gaussians.compute_2d_covariance_elements(scales, rotation)
         inv_00, inv_01, inv_11 = self.gaussians.invert_cov_2D(cov_00, cov_01, cov_11)
 
+        # Complex hologram initialization
         hologram = torch.zeros((C, H, W), dtype=torch.complex64, device=device)
 
         # Per-Gaussian complex amplitude
         phase_factor = torch.exp(1j * phase)
         complex_features = (colours * phase_factor).to(torch.complex64)  # [N, 1]
 
-        # Culling radius: 3 sigma along the major axis (largest covariance eigenvalue)
+        # Culling radius (3-sigma rule)
         mid  = 0.5 * (cov_00 + cov_11)
         disc = torch.sqrt(((cov_00 - cov_11) * 0.5) ** 2 + cov_01 ** 2)
         radius = 3.0 * torch.sqrt(mid + disc)
@@ -423,8 +414,12 @@ class Scene2D:
 
 def make_trainable_2d(gaussians):
     """Make 2D Gaussian parameters trainable"""
-    params = [gaussians.means_2d, gaussians.pre_act_scales, gaussians.pre_act_rotation,
-              gaussians.colours, gaussians.pre_act_phase, gaussians.pre_act_opacities,
+    params = [gaussians.means_2d,
+              gaussians.pre_act_scales,
+              gaussians.pre_act_rotation,
+              gaussians.colours,
+              gaussians.pre_act_phase,
+              gaussians.pre_act_opacities,
               gaussians.curvature]
     for p in params:
         p.requires_grad_()

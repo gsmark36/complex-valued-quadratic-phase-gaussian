@@ -12,13 +12,15 @@ PIPE=${1:-all}
 RATIO=${2:-0.2}
 shift 2 || shift $#
 
-IMAGES=(pencils redcar flower straw dragon tiger windmill statue burger bento)
+IMAGES=(pencil redcar flower straw dragon tiger windmill statue burger bento)
 
 run_pipeline() {  # $1 = rgb | grayscale
   local pipe=$1 out=results/benchmark_${1}_${RATIO}
+  shift  # the remaining "$@" are the extra train args only
   mkdir -p "$out"
   for name in "${IMAGES[@]}"; do
     img=$(ls data/${name}.jpg data/${name}.png 2>/dev/null | head -n 1)
+    [ -n "$img" ] || { echo "No data/${name}.jpg or data/${name}.png"; exit 1; }
     for prim in flat curv; do
       tag=${name}_$([ "$prim" = flat ] && echo flat || echo cvqpg)
       if [ -f "$out/$tag/metrics.json" ]; then echo "skip $out/$tag (done)"; continue; fi
