@@ -2,10 +2,10 @@
 
 # Hologram Representation via Quadratic Phase Gaussian Splatting
 
-[![DOI](https://img.shields.io/badge/DOI-10.1145%2F3829339.3847858-orange)](https://doi.org/10.1145/3829339.3847858)
-[![arXiv](https://img.shields.io/badge/arXiv-2609.11434-b31b1b)](https://arxiv.org/abs/2609.11434)
+[![DOI](https://img.shields.io/badge/DOI-10.1145%2F3829339.3847858-orange?logo=acm)](https://doi.org/10.1145/3829339.3847858)
+[![arXiv](https://img.shields.io/badge/arXiv-2609.11434-b31b1b?logo=arXiv)](https://arxiv.org/abs/2609.11434)
 [![GitHub](https://img.shields.io/badge/GitHub-Code-black?logo=github)](https://github.com/gsmark36/complex-valued-quadratic-phase-gaussian)
-[![Website](https://img.shields.io/badge/Project%20Website-orange?logo=googlechrome&logoColor=white&color=155ECB)]()
+[![Website](https://img.shields.io/badge/Project%20Website-155ECB)]()
 
 **SIGGRAPH Asia 2026 Technical Communications**
 
