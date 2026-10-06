@@ -7,3 +7,4 @@ results/*
 .vscode/
 .idea/
 odak.log
+cuda/build/

@@ -258,6 +258,14 @@ class Scene2D:
         # Gradient checkpointing of the per-tile render body
         self.grad_ckpt = getattr(args_prop, 'grad_ckpt', False)
 
+        # Renderer backend: 'torch' (tile loop below) or 'cuda' (rasterizer in cuda/)
+        self.renderer = getattr(args_prop, 'renderer', 'torch')
+        if self.renderer == 'cuda':
+            if self.phase_iso:
+                raise ValueError("--phase_iso is only supported by the torch renderer")
+            if not str(self.device).startswith('cuda'):
+                raise ValueError("--renderer cuda needs a CUDA device")
+
     def evaluate_gaussians_2d_optimized(self, points_2d, means_2d, inv_00, inv_01, inv_11):
         """
         Vectorized evaluation of 2D Gaussians
@@ -377,6 +385,11 @@ class Scene2D:
         cov_00, cov_01, cov_11 = self.gaussians.compute_2d_covariance_elements(scales, rotation)
         inv_00, inv_01, inv_11 = self.gaussians.invert_cov_2D(cov_00, cov_01, cov_11)
 
+        if self.renderer == 'cuda':
+            hologram = self._render_cuda(img_size, k, dxy2, colours, phase, opacities, means_2d, curvature,
+                                         scales, cov_00, cov_01, cov_11, inv_00, inv_01, inv_11)
+            return soft_window_pad(hologram, self.args_prop.pad_size)
+
         # Complex hologram initialization
         hologram = torch.zeros((C, H, W), dtype=torch.complex64, device=device)
 
@@ -407,6 +420,23 @@ class Scene2D:
 
         hologram_field = soft_window_pad(hologram, self.args_prop.pad_size)
         return hologram_field
+
+    def _render_cuda(self, img_size, k, dxy2, colours, phase, opacities, means_2d, curvature,
+                     scales, cov_00, cov_01, cov_11, inv_00, inv_01, inv_11):
+        """Same complex field as the tile loop, computed by the CUDA rasterizer [C, H, W]"""
+        from cuda import qpf_render  # compiled on first use
+        W, H = img_size
+        inv_cov = torch.stack([inv_00, inv_01, inv_11], dim=-1)
+        area = (scales[:, 0] * scales[:, 1]).abs()
+
+        # Culling radius of 5 sigma, close to the float32 noise floor of the uncut sum
+        with torch.no_grad():
+            mid  = 0.5 * (cov_00 + cov_11)
+            disc = torch.sqrt(((cov_00 - cov_11) * 0.5) ** 2 + cov_01 ** 2)
+            radii = (5.0 * torch.sqrt(mid + disc)).ceil().to(torch.int32)
+
+        return qpf_render(means_2d, inv_cov, colours, phase, opacities, curvature, area,
+                          radii, k.contiguous(), dxy2, W, H)
 
     def render(self, img_size: Tuple[int, int]):
         """Render the padded complex hologram [C, pH, pW]"""

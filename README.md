@@ -19,7 +19,7 @@
 
 ## Overview
 
-This repository contains the PyTorch implementation of **Complex-Valued Quadratic Phase Gaussian (CVQPG)**, a novel hologram representation method that augments each 2D Gaussian primitive with a quadratic phase profile controlled by a learnable curvature parameter. 
+This repository contains the implementation of **Complex-Valued Quadratic Phase Gaussian (CVQPG)**, a novel hologram representation method that augments each 2D Gaussian primitive with a quadratic phase profile controlled by a learnable curvature parameter. 
 
 The code builds on the work [Complex-Valued 2D Gaussian Representation for Computer-Generated Holography](https://github.com/complight/Complex-Valued_2D_Gaussian_Representation) (ECCV 2026), which is also used as the baseline model for comparison. 
 
@@ -32,6 +32,10 @@ This project depends on the scientific computing toolkit [Odak](https://github.c
 ├── model_2d_gaussian_grayscale.py    # Gaussian primitives + tile renderer, grayscale
 ├── train_2d_gaussian_rgb.py          # training / evaluation, RGB
 ├── train_2d_gaussian_grayscale.py    # training / evaluation, grayscale
+├── export_poh.py                     # phase-only hologram export
+├── cuda/                             # optional CUDA rasterizer
+│   ├── rasterizer.py                 # autograd wrapper (compiled on first use)
+│   └── *.cu, *.cpp, *.h              # forward / backward kernels
 ├── utils/
 │   ├── data_utils.py                 # SSIM loss, multi-plane targets, seeding
 │   ├── propagator.py                 # BLASM propagation, multi-plane defocus loss
@@ -61,13 +65,23 @@ pip install -r requirements.txt
 ### Odak version
 The propagation utilities depend on [Odak](https://github.com/kaanaksit/odak). 
 
-`requirements.txt` installs **Odak 0.2.7** from PyPI, which may introduce floating-point noises to the results. 
+`requirements.txt` installs **Odak 0.2.7** from PyPI, which may introduce floating-point noise to the results. 
 
-Install **Odak 0.2.8** to reproduce bit-exactly results from the paper. 
+Install **Odak 0.2.8** to reproduce bit-exact results from the paper. 
 
 ```bash
 pip install "odak @ git+https://github.com/kaanaksit/odak@4057dc2bde1c9ad1bce22fc091cf8c2a1a9f010f"
 ```
+
+### CUDA renderer (optional)
+
+`--renderer cuda` replaces the PyTorch tile renderer with the CUDA rasterizer in `cuda/`. It is compiled automatically on first use (cached in `cuda/build/`) and needs the CUDA compiler `nvcc` with the same major version as the CUDA build of PyTorch. 
+
+```bash
+conda install -c nvidia cuda-nvcc=12.8
+```
+
+The CUDA rasterizer reduces the runtime and GPU memory to **1.6 min** and **1 GB** for the default RGB setting. The results are **not bit-identical** to the PyTorch renderer. 
 
 ## Quick start
 
@@ -80,17 +94,23 @@ python train_2d_gaussian_grayscale.py
 python train_2d_gaussian_rgb.py --primitive flat
 python train_2d_gaussian_grayscale.py --primitive flat
 
+# CUDA renderer (optional)
+python train_2d_gaussian_rgb.py --renderer cuda
+
 # flat vs CVQPG on one scene, then print a comparison table
 bash scripts/run_rgb.sh flower
 bash scripts/run_grayscale.sh dragon
 
 # all 10 scenes (RGB, compression ratio 0.2)
 bash scripts/run_benchmark.sh rgb 0.2
+
+# export phase-only holograms of a finished run (flower_rgb_curv)
+python export_poh.py results/flower_rgb_curv
 ```
 
 Each run writes to `<result_base>/<tag>/` (default `results/<image>_<rgb|gray>_<primitive>/`). 
 
-| file | content |
+| output file | content |
 |---|---|
 | `log.txt` | arguments, plane distances, and per-plane PSNR / SSIM / LPIPS / FLIP / CVVDP at every evaluation |
 | `metrics.json` | metrics of the final evaluation |
@@ -99,25 +119,13 @@ Each run writes to `<result_base>/<tag>/` (default `results/<image>_<rgb|gray>_<
 | `phase_<iter>.png`, `amp_<iter>.png` | phase and amplitude of the complex hologram (one color channel per wavelength for RGB, false color for grayscale) |
 | `gaussian_positions_<iter>.png` | Gaussian center positions, colored by curvature |
 | `checkpoints/` | Gaussian parameters (.pth) saved at each evaluation. Optimizer state is not saved. |
+| `poh/` | phase-only holograms, written by `export_poh.py` (see [POH export](#poh-export)) |
 
 ## Usage
 
 ### Dataset
 
-`data/` contains the 10 scenes used in the paper (5.7 MB in total). Each scene consists of a target image and a depth map. 
-
-| scene | image | depth map |
-|---|---|---|
-| `bento` | `bento.jpg`, 1024×746 | `bento_depth.png`, 1024×746 |
-| `burger` | `burger.jpg`, 2048×1366 | `burger_depth.png`, 2560×1536 |
-| `dragon` | `dragon.jpg`, 1024×680 | `dragon_depth.png`, 1024×680 |
-| `flower` | `flower.png`, 1008×756 | `flower_depth.png`, 1008×756 |
-| `pencil` | `pencil.jpg`, 1024×768 | `pencil_depth.png`, 1024×768 |
-| `redcar` | `redcar.jpg`, 1024×768 | `redcar_depth.png`, 1024×768 |
-| `statue` | `statue.jpg`, 1024×683 | `statue_depth.png`, 1024×683 |
-| `straw` | `straw.jpg`, 1024×768 | `straw_depth.png`, 1024×768 |
-| `tiger` | `tiger.jpg`, 1024×683 | `tiger_depth.png`, 1024×683 |
-| `windmill` | `windmill.jpg`, 1023×670 | `windmill_depth.png`, 1023×670 |
+`data/` contains the 10 scenes used in the paper. Each scene consists of a target image and a depth map. 
 
 To use your own data, pass an image with `--target_image_path` and a depth map with `--depth_path`. 
 
@@ -140,65 +148,28 @@ To use your own data, pass an image with `--target_image_path` and a depth map w
 | iterations / warm-up | 2001 / 400 | 2001 / 400 |
 | curvature bound | scale-aware, η = 0.9 | scale-aware, η = 0.9 |
 
-### Training options
+Run `python train_2d_gaussian_rgb.py -h` for the list of training options. 
 
-**Data / output**
+### POH export
 
-| option | default | description |
-|---|---|---|
-| `--target_image_path` | `./data/flower.png` | Target image |
-| `--depth_path` | `./data/flower_depth.png` | Depth map in [0,255], pass `''` for a single-plane target without depth |
-| `--result_base` | `./results` | Base output directory |
-| `--tag` | `<image>_rgb_<primitive>` / `<image>_gray_<primitive>` | Folder name under `--result_base` |
+`export_poh.py` converts the complex hologram of a finished run into the phase-only hologram (POH) with double-phase amplitude coding (DPAC). No retraining is needed. RGB and grayscale runs are detected automatically. 
 
-**Representation**
+The result folder must contain `log.txt` (for training settings) and `checkpoints/`. The target image and depth map recorded in `log.txt` are optional (only used for metrics). 
 
-| option | default | description |
-|---|---|---|
-| `--img_size W H` | `640 480` | Target resolution |
-| `--compression_ratio` | `0.2` | Gaussian number N = W·H/2·ratio (RGB) or W·H/4·ratio (grayscale) |
-| `--num_gaussians` | – | Explicit Gaussian count (overrides `--compression_ratio`) |
-| `--primitive` | `curv` | `curv` = CVQPG, `flat` = flat-phase baseline |
-| `--curv_mode` | `scale_aware` | Curvature bound: `scale_aware` (per-Gaussian Nyquist) or `constant` (200*tanh) |
-| `--curv_nyquist` | `0.9` | Fraction η of the per-Gaussian 3σ Nyquist limit |
-| `--warmup_iters` | `400` | Number of warm-up iterations |
-| `--phase_iso` | `0` | Enable isotropic/standard quadratic phase factor for ablation study |
+```bash
+python export_poh.py results/flower_rgb_curv                     # result folder
+python export_poh.py flower_rgb_curv                             # tag under ./results
+python export_poh.py results/flower_rgb_curv/checkpoints/best_gaussians_2d_2000.pth   # checkpoint file
+```
 
-**Optimization**
+| output file | content |
+|---|---|
+| `poh_<c>.png` | 8-bit padded POH of wavelength c (c = 0, 1, 2 for RGB, 0 for grayscale) |
+| `recon_poh_<k>.png` | reconstruction of plane k from the 8-bit POH, through the Fourier aperture |
+| `recon_complex_<k>.png` | reconstruction of plane k from the complex hologram |
+| `poh_metrics.json` | export settings, and PSNR / SSIM / LPIPS / FLIP / CVVDP of both reconstructions |
 
-| option | default | description |
-|---|---|---|
-| `--num_itrs` | `2001` | Number of training iterations |
-| `--lr` | `0.01` | Learning rate of the Gaussian means |
-| `--eval_freq` | `500` | Evaluation and checkpoint interval |
-| `--viz_freq` | `1000` | Results saving interval (`0` = disabled) |
-| `--seed` | `100` | Random seed |
-
-**Optics**
-
-| option | default | description |
-|---|---|---|
-| `--wavelengths` (RGB) | `639e-9 532e-9 473e-9` | R, G, B wavelengths (m) |
-| `--wavelength` (grayscale) | `639e-9` | Wavelength (m) |
-| `--pixel_pitch` | `3.74e-6` | SLM pixel pitch (m) |
-| `--num_planes` | `2` | Number of supervised depth planes |
-| `--d_val` | `3e-3` | Propagation distance to the center of the volume (m) |
-| `--volume_depth` | `4e-3` | Depth span of the multi-plane stack (m) |
-| `--split_ratio` | `1.0` | Depth exponent used when splitting into 2 planes |
-| `--pad_size pH pW` | auto | Padded size for propagation |
-| `--aperture_size` | `0` | Fourier aperture radius in px (`0` = off, `-1` = sum(img_size)/1.4, `>0` = explicit) |
-
-**Performance**
-
-| option | default | description |
-|---|---|---|
-| `--grad_ckpt` | `0` | Enable gradient checkpointing in the renderer for memory savings |
-| `--tile_size` | `64` | Renderer tile size in px |
-| `--gauss_batch` | `1024` | Gaussians per renderer batch |
-| `--tf32` | `1` | Enable TF32 matmul on Ampere+ GPUs (`0` = float32) |
-| `--device` | `cuda` | Training device |
-
-Run `python train_2d_gaussian_rgb.py -h` for the list in the terminal. 
+Run `python export_poh.py -h` for export options. 
 
 ## Citation
 

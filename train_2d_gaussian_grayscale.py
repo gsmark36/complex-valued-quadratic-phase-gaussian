@@ -316,10 +316,12 @@ def get_args():
     parser.add_argument("--aperture_size", default=0, type=int,
                         help="Fourier aperture radius in px (0 = disabled, -1 = sum(img_size)/1.4, >0 = explicit radius in px)")
     # Performance
-    parser.add_argument("--tile_size", default=64, type=int, help="Renderer tile size in px")
-    parser.add_argument("--gauss_batch", default=1024, type=int, help="Gaussians per renderer batch")
+    parser.add_argument("--renderer", default="torch", type=str, choices=["torch", "cuda"],
+                        help="'torch' = pure PyTorch tile renderer, 'cuda' = CUDA rasterizer (--phase_iso 1 not supported)")
+    parser.add_argument("--tile_size", default=64, type=int, help="Renderer tile size in px (torch renderer only)")
+    parser.add_argument("--gauss_batch", default=1024, type=int, help="Gaussians per renderer batch (torch renderer only)")
     parser.add_argument("--grad_ckpt", default=0, type=int,
-                        help="Enable gradient checkpointing in the renderer for memory savings")
+                        help="Enable gradient checkpointing in the renderer for memory savings (torch renderer only)")
     parser.add_argument("--tf32", default=1, type=int, help="Enable TF32 matmul on Ampere+ GPUs (0 = float32)")
     parser.add_argument("--device", default="cuda", type=str, choices=["cuda", "cpu"], help="Training device")
     return parser.parse_args()
@@ -353,6 +355,7 @@ if __name__ == "__main__":
         gauss_batch=args.gauss_batch,
         phase_iso=bool(args.phase_iso),
         grad_ckpt=bool(args.grad_ckpt),
+        renderer=args.renderer,
     )
     device = torch.device(args.device if (args.device == "cuda" and torch.cuda.is_available()) else "cpu")
 
