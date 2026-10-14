@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Primary Meta Tags -->
+  <meta name="title" content="Hologram Representation via Quadratic Phase Gaussian Splatting - Haolong Wang, Yicheng Zhan, Kaan Akşit, Simeng Qiu">
+  <meta name="description" content="We introduce Complex-Valued Quadratic Phase Gaussian (CVQPG), a hologram representation that augments each 2D Gaussian with a learnable quadratic phase.">
+
+  <!-- Academic/Research Specific
+  <meta name="citation_title" content="PAPER_TITLE">
+  <meta name="citation_author" content="FIRST_AUTHOR_LAST, FIRST_AUTHOR_FIRST">
+  <meta name="citation_author" content="SECOND_AUTHOR_LAST, SECOND_AUTHOR_FIRST">
+  <meta name="citation_publication_date" content="2024">
+  <meta name="citation_conference_title" content="CONFERENCE_NAME">
+  <meta name="citation_pdf_url" content="https://YOUR_DOMAIN.com/static/pdfs/paper.pdf">
+  -->
+
+  <!-- Preconnect for performance -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://ajax.googleapis.com">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+
+  <title>Hologram Representation via Quadratic Phase Gaussian Splatting - Haolong Wang, Yicheng Zhan, Kaan Akşit, Simeng Qiu</title>
+
+  <!-- Favicon: empty icon -> browser default globe -->
+  <link rel="icon" href="data:,">
+
+  <!-- Critical CSS - Load synchronously -->
+  <link rel="stylesheet" href="static/css/bulma.min.css">
+  <link rel="stylesheet" href="static/css/index.css">
+
+  <!-- Non-critical CSS - Load asynchronously -->
+  <link rel="preload" href="static/css/bulma-carousel.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <link rel="preload" href="static/css/bulma-slider.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <link rel="preload" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+
+  <!-- Fallback for browsers that don't support preload -->
+  <noscript>
+    <link rel="stylesheet" href="static/css/bulma-carousel.min.css">
+    <link rel="stylesheet" href="static/css/bulma-slider.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  </noscript>
+
+  <!-- Fonts - Optimized loading -->
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro&display=swap" rel="stylesheet">
+
+  <!-- Defer non-critical JavaScript -->
+  <script defer src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script defer src="static/js/fontawesome.all.min.js"></script>
+  <script defer src="static/js/bulma-carousel.min.js"></script>
+  <script defer src="static/js/bulma-slider.min.js"></script>
+  <!-- KaTeX for the equations: \( inline \) and \[ display \] (rendered in static/js/index.js) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+  <script defer src="static/js/index.js"></script>
+</head>
+<body>
+
+  <!-- Scroll to Top Button -->
+  <button class="scroll-to-top" onclick="scrollToTop()" title="Scroll to top" aria-label="Scroll to top">
+    <i class="fas fa-chevron-up"></i>
+  </button>
+
+  <main id="main-content">
+
+    <!-- Title, authors, links -->
+    <section class="hero">
+      <div class="hero-body">
+        <div class="container is-max-desktop">
+          <div class="columns is-centered">
+            <div class="column has-text-centered">
+              <h1 class="title is-1 publication-title">Hologram Representation via Quadratic Phase Gaussian Splatting</h1>
+
+              <div class="is-size-5 publication-authors">
+                <!-- Authors: <sup>N</sup> = affiliation number below -->
+                <span class="author-block"><a href="https://gsmark36.github.io/" target="_blank">Haolong Wang</a> <sup>1</sup>,</span>
+                <span class="author-block"><a href="https://albertgary.github.io/" target="_blank">Yicheng Zhan</a> <sup>2</sup>,</span>
+                <span class="author-block"><a href="https://www.kaanaksit.com/" target="_blank">Kaan Akşit</a> <sup>2</sup>,</span>
+                <span class="author-block"><a href="https://qsimeng.github.io/" target="_blank">Simeng Qiu</a> <sup>1</sup></span>
+              </div>
+
+              <div class="is-size-5 publication-authors">
+                <!-- Affiliations -->
+                <span class="author-block"><sup>1</sup> Swansea University </span>
+                <span class="author-block"><sup>2</sup> University College London </span>
+                <br>
+                <span class="publication-venue">SIGGRAPH Asia 2026 Technical Communications</span>
+              </div>
+
+              <div class="column has-text-centered">
+                <div class="publication-links">
+                  <span class="link-block">
+                    <a href="https://doi.org/10.1145/3829339.3847858" target="_blank"
+                       class="external-link button is-normal is-rounded is-dark">
+                      <span class="icon">
+                        <i class="fas fa-file-pdf"></i>
+                      </span>
+                      <span>Paper</span>
+                    </a>
+                  </span>
+
+                  <span class="link-block">
+                    <a href="https://arxiv.org/abs/2609.11434" target="_blank"
+                       class="external-link button is-normal is-rounded is-dark">
+                      <span class="icon">
+                        <i class="ai ai-arxiv"></i>
+                      </span>
+                      <span>arXiv</span>
+                    </a>
+                  </span>
+
+                  <span class="link-block">
+                    <a href="https://github.com/gsmark36/complex-valued-quadratic-phase-gaussian" target="_blank"
+                       class="external-link button is-normal is-rounded is-dark">
+                      <span class="icon">
+                        <i class="fab fa-github"></i>
+                      </span>
+                      <span>Code</span>
+                    </a>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <!-- End title, authors, links -->
+
+    <!-- Teaser: CVQPG training on Windmill (Nerfies style: autoplay + loop, no controls).
+         static/videos/train_windmill.mp4 = publication/visual/train_windmill.mp4 re-encoded
+         (1564x1186, H.264 crf 30, faststart, no audio); poster = its first frame. -->
+    <section class="hero teaser">
+      <div class="container is-max-desktop">
+        <div class="hero-body">
+          <video id="teaser" class="train-video" width="1564" height="1186" autoplay muted loop playsinline disablepictureinpicture
+                 preload="auto" poster="static/images/train_windmill_poster.jpg">
+            <source src="static/videos/train_windmill.mp4" type="video/mp4">
+          </video>
+          <h2 class="subtitle has-text-centered">
+            Optimizing CVQPG on the Windmill scene (RGB, 15,360 Gaussians). The curvature <i>γ</i> of every Gaussian is locked at zero for the first 400 iterations (warm-up stage), then optimized jointly, improving the PSNR gain over the planar Gaussian baseline.
+          </h2>
+        </div>
+      </div>
+    </section>
+    <!-- End teaser -->
+
+    <!-- Paper abstract -->
+    <section class="section">
+      <div class="container is-max-desktop">
+        <div class="columns is-centered has-text-centered">
+          <div class="column is-four-fifths">
+            <h2 class="title is-3">Abstract</h2>
+            <div class="content has-text-justified">
+              <!-- TODO: Replace with your paper abstract -->
+              <p>
+                We introduce Complex-Valued Quadratic Phase Gaussian (CVQPG), a novel hologram representation method that augments each 2D Gaussian primitive with a quadratic phase profile controlled by a learnable curvature parameter. Against the planar Gaussian baseline, CVQPG improves the average PSNR of holographic reconstructions by 0.19 dB (RGB) and 0.33 dB (grayscale) at equal primitive counts, and by 0.05 dB (RGB) and 0.08 dB (grayscale) at equal parameter counts, where it still leads in all visual quality metrics. Our frequency-domain analysis shows that CVQPG better preserves the mid-to-high frequency band of natural images, where the reconstruction MSE drops by up to 11% (RGB) and 22% (grayscale), indicating that modulating primitive wavefronts is an effective and lightweight enhancement.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <!-- End paper abstract -->
+
+    <!-- Method -->
+    <section class="section" id="method">
+      <div class="container is-max-desktop">
+        <h2 class="title is-3 has-text-centered">Method</h2>
+
+        <!-- Pipeline -->
+        <h3 class="title is-4">Pipeline</h3>
+        <div class="content has-text-justified">
+          <p>
+            A set of 2D Gaussian primitives are rasterized into a complex hologram (amplitude and phase), propagated to several depth planes, and compared with synthesized RGB+D targets at each focus.
+          </p>
+        </div>
+        <img class="figure" src="static/images/pipeline.png" width="2658" height="768" loading="lazy"
+             alt="Pipeline: Gaussian primitives with a learnable curvature are rasterized into a complex hologram, propagated to two focal planes, and compared with synthesized targets.">
+        <p class="figure-caption">Pipeline of CVQPG. We only introduce one extra curvature parameter \(\gamma\) for each primitive.</p>
+
+        <!-- CVQPG representation -->
+        <h3 class="title is-4">Complex-Valued Quadratic Phase Gaussian (CVQPG)</h3>
+        <div class="content has-text-justified">
+          <p>
+            <b>Learnable curvature.</b> Each primitive carries a quadratic phase controlled by one curvature parameter \(\gamma = 1/f\):
+          </p>
+          \[
+            \begin{gathered}
+              \mathcal{G}(\mathbf{p}) = \alpha\,\mathbf{c}\,
+                \exp\!\big(-\tfrac{1}{2} D^2_{mah}(\mathbf{p})\big)\,
+                \exp(j\boldsymbol{\varphi})\, Q_{mah}(\mathbf{p}), \\[6pt]
+              Q_{mah}(\mathbf{p}) = \exp\!\Big(j\,\frac{k\gamma\det(\mathbf{S})}{2}\, D^2_{mah}(\mathbf{p})\Big).
+            \end{gathered}
+          \]
+          <p>
+            The curvature acts like a virtual lens associated with the planar Gaussian light source: converging for \(\gamma &lt; 0\), planar at \(\gamma = 0\), diverging for \(\gamma &gt; 0\).
+          </p>
+        </div>
+        <!-- Single-primitive animations: widths in index.css (.qpf-*) make their panels equally tall -->
+        <video class="method-video qpf-unit-test" width="1280" height="894" autoplay muted loop playsinline disablepictureinpicture
+               preload="metadata" poster="static/images/unit_test_qpf_poster.jpg">
+          <source src="static/videos/unit_test_qpf.mp4" type="video/mp4">
+        </video>
+        <p class="figure-caption">Phase of one primitive as \(\gamma\) sweeps.</p>
+
+        <video class="method-video qpf-side-view" width="1280" height="812" autoplay muted loop playsinline disablepictureinpicture
+               preload="metadata" poster="static/images/side_view_qpf_poster.jpg">
+          <source src="static/videos/side_view_qpf.mp4" type="video/mp4">
+        </video>
+        <p class="figure-caption">Side view of the propagated field from a CVQPG primitive.</p>
+
+        <div class="content has-text-justified">
+          <p>
+            <b>Mahalanobis QPF.</b> Measuring the phase with the Mahalanobis distance keeps the fringes aligned with the anisotropic envelope.
+          </p>
+        </div>
+        <video class="method-video qpf-shape-compare" width="1440" height="682" autoplay muted loop playsinline disablepictureinpicture
+               preload="metadata" poster="static/images/shape_compare_qpf_poster.jpg">
+          <source src="static/videos/shape_compare_qpf.mp4" type="video/mp4">
+        </video>
+        <p class="figure-caption">Standard QPF vs. Mahalanobis QPF as the primitive changes shape.</p>
+
+        <!-- Curvature control and optimization -->
+        <h3 class="title is-4">Curvature Control and Optimization</h3>
+        <div class="content has-text-justified">
+          <p>
+            <b>Scale-adaptive curvature bound.</b> Each primitive's curvature is bounded by the SLM Nyquist limit to avoid aliasing:
+          </p>
+          \[
+            \gamma_{\max} = \eta\,\frac{\lambda}{6\sigma\,(\Delta x)^2}, \qquad \eta = 0.9,
+          \]
+          <p>
+            where \(\sigma\) is the equivalent standard deviation, \(\lambda\) is the wavelength, and \(\Delta x\) is the pixel pitch.
+          </p>
+          <p>
+            <b>Curvature warm-up strategy.</b> \(\gamma\) stays at 0 for the first 400 of 2,000 iterations, then is optimized jointly.
+          </p>
+        </div>
+        <video class="method-video train-video" width="1564" height="1186" autoplay muted loop playsinline disablepictureinpicture
+               preload="metadata" poster="static/images/train_flower_poster.jpg">
+          <source src="static/videos/train_flower.mp4" type="video/mp4">
+        </video>
+        <p class="figure-caption">Optimization on the Flower scene (RGB, 15,360 Gaussians).</p>
+      </div>
+    </section>
+    <!-- End method -->
+
+    <!-- Results -->
+    <section class="section" id="results">
+      <div class="container is-max-desktop">
+        <h2 class="title is-3 has-text-centered">Results</h2>
+
+        <!-- Quantitative comparison (simplified main table) -->
+        <h3 class="title is-4">Quantitative Comparison</h3>
+        <div class="content has-text-justified">
+          <p>
+            CVQPG improves PSNR and visual quality consistently across all settings and metrics, by 0.19&nbsp;dB (RGB)
+            and 0.33&nbsp;dB (grayscale) at equal primitive counts, and keeps its lead over Baseline<sup>+</sup> at equal
+            parameter counts, showing that wavefront modulation is more effective than adding more planar Gaussians.
+          </p>
+        </div>
+        <div class="table-container">
+          <table class="table is-hoverable is-narrow results-table">
+            <thead>
+              <tr><th>Setting</th><th>Method</th><th><i>N</i></th><th>PSNR&nbsp;&uarr;</th><th>SSIM&nbsp;&uarr;</th><th>LPIPS&nbsp;&darr;</th><th>FLIP&nbsp;&darr;</th><th>CVVDP&nbsp;&uarr;</th></tr>
+            </thead>
+            <tbody>
+              <tr><td rowspan="4">RGB 20%</td><td>Baseline</td><td>30,720</td><td>29.265</td><td>0.8307</td><td>0.2895</td><td>0.1144</td><td>9.168</td></tr>
+              <tr><td>Baseline<sup>+</sup></td><td>33,280</td><td>29.386</td><td>0.8336</td><td>0.2853</td><td>0.1134</td><td>9.186</td></tr>
+              <tr class="is-ours"><td>CVQPG</td><td>30,720</td><td>29.450</td><td>0.8364</td><td>0.2828</td><td>0.1125</td><td>9.203</td></tr>
+              <tr class="is-delta"><td>&Delta;</td><td></td><td>+0.185</td><td>+0.0057</td><td>&minus;0.0066</td><td>&minus;0.0019</td><td>+0.035</td></tr>
+              <tr><td rowspan="4">RGB 10%</td><td>Baseline</td><td>15,360</td><td>28.034</td><td>0.7992</td><td>0.3292</td><td>0.1292</td><td>8.917</td></tr>
+              <tr><td>Baseline<sup>+</sup></td><td>16,640</td><td>28.179</td><td>0.8034</td><td>0.3241</td><td>0.1271</td><td>8.950</td></tr>
+              <tr class="is-ours"><td>CVQPG</td><td>15,360</td><td>28.225</td><td>0.8053</td><td>0.3217</td><td>0.1265</td><td>8.966</td></tr>
+              <tr class="is-delta"><td>&Delta;</td><td></td><td>+0.191</td><td>+0.0060</td><td>&minus;0.0076</td><td>&minus;0.0026</td><td>+0.049</td></tr>
+              <tr><td rowspan="4">Grayscale 20%</td><td>Baseline</td><td>15,360</td><td>29.504</td><td>0.8340</td><td>0.3813</td><td>0.0753</td><td>8.935</td></tr>
+              <tr><td>Baseline<sup>+</sup></td><td>17,280</td><td>29.753</td><td>0.8394</td><td>0.3766</td><td>0.0733</td><td>8.988</td></tr>
+              <tr class="is-ours"><td>CVQPG</td><td>15,360</td><td>29.834</td><td>0.8443</td><td>0.3694</td><td>0.0725</td><td>9.019</td></tr>
+              <tr class="is-delta"><td>&Delta;</td><td></td><td>+0.331</td><td>+0.0103</td><td>&minus;0.0119</td><td>&minus;0.0028</td><td>+0.085</td></tr>
+              <tr><td rowspan="4">Grayscale 10%</td><td>Baseline</td><td>7,680</td><td>28.076</td><td>0.7964</td><td>0.4204</td><td>0.0888</td><td>8.548</td></tr>
+              <tr><td>Baseline<sup>+</sup></td><td>8,640</td><td>28.317</td><td>0.8030</td><td>0.4134</td><td>0.0862</td><td>8.621</td></tr>
+              <tr class="is-ours"><td>CVQPG</td><td>7,680</td><td>28.398</td><td>0.8079</td><td>0.4069</td><td>0.0850</td><td>8.658</td></tr>
+              <tr class="is-delta"><td>&Delta;</td><td></td><td>+0.322</td><td>+0.0115</td><td>&minus;0.0135</td><td>&minus;0.0038</td><td>+0.109</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="figure-caption">
+          Averaged over ten scenes and two depth planes. Baseline has the same primitive count <i>N</i> as CVQPG,
+          Baseline<sup>+</sup> the same parameter count. &Delta;: CVQPG over Baseline. CVQPG (bold) is best in every column.
+        </p>
+
+        <!-- Frequency analysis -->
+        <h3 class="title is-4">Frequency Analysis</h3>
+        <div class="content has-text-justified">
+          <p>
+            The gain concentrates in the mid-to-high frequency band: up to 11% (RGB) and 22% (grayscale) MSE reduction.
+          </p>
+        </div>
+        <img class="figure freq-figure" src="static/images/frequency.png" width="1178" height="676" loading="lazy"
+             alt="Frequency-resolved MSE reduction of CVQPG over the baseline: near zero at low frequency, peaking in the mid-to-high band, decaying near Nyquist.">
+        <p class="figure-caption">Frequency-resolved \(\Delta\)MSE of CVQPG over the baseline.</p>
+
+        <!-- Visual comparison -->
+        <h3 class="title is-4">Visual Comparison</h3>
+        <div id="results-carousel" class="carousel results-carousel" style="--slide-aspect: 3 / 1;">
+          <div class="item">
+            <img src="static/images/results.jpg" width="2380" height="676" loading="lazy" alt="Flower scene, RGB 20%: CVQPG vs. baseline at both focal planes.">
+            <h2 class="subtitle has-text-centered">Flower, RGB 20%</h2>
+          </div>
+          <div class="item">
+            <img src="static/images/demo_rgb_sushi.jpg" width="2380" height="676" loading="lazy" alt="Sushi scene, RGB 20%: CVQPG vs. baseline at both focal planes.">
+            <h2 class="subtitle has-text-centered">Sushi, RGB 20%</h2>
+          </div>
+          <div class="item">
+            <img src="static/images/demo_gray_bento.jpg" width="2380" height="676" loading="lazy" alt="Bento scene, grayscale 20%: CVQPG vs. baseline at both focal planes.">
+            <h2 class="subtitle has-text-centered">Bento, grayscale 20%</h2>
+          </div>
+          <div class="item">
+            <img src="static/images/siemens_star.png" width="1511" height="820" loading="lazy" alt="Siemens star, single plane: CVQPG 34.57 dB vs. baseline 31.53 dB PSNR.">
+            <h2 class="subtitle has-text-centered">Siemens star comparison (grayscale, single plane)</h2>
+          </div>
+        </div>
+
+        <!-- Prototype -->
+        <h3 class="title is-4">Holographic Display Prototype</h3>
+        <div class="content has-text-justified">
+          <p>
+            Phase-only holograms encoded from CVQPG (3840&nbsp;&times;&nbsp;2160), captured on our display prototype.
+          </p>
+        </div>
+        <div class="columns is-vcentered">
+          <div class="column is-7">
+            <img class="figure" src="static/images/hardware.jpg" width="1408" height="1060" loading="lazy" alt="Holographic display prototype on the optical bench.">
+            <p class="figure-caption">Holographic display prototype.</p>
+          </div>
+          <div class="column is-5">
+            <img class="figure" src="static/images/capture_burger.jpg" width="999" height="1144" loading="lazy" alt="Captured Burger scene at rear and front focus.">
+            <p class="figure-caption">Captured result, rear (top) and front (bottom) focus.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+    <!-- End results -->
+
+    <!-- BibTeX citation -->
+    <section class="section" id="BibTeX">
+      <div class="container is-max-desktop content">
+        <div class="bibtex-header">
+          <h2 class="title">BibTeX</h2>
+          <button class="copy-bibtex-btn" onclick="copyBibTeX()" title="Copy BibTeX to clipboard">
+            <i class="fas fa-copy"></i>
+            <span class="copy-text">Copy</span>
+          </button>
+        </div>
+        <!-- <pre> keeps whitespace verbatim: do not indent the BibTeX lines -->
+        <pre id="bibtex-code"><code>@inproceedings{wang2026hologram,
+  author = {Wang, Haolong and Zhan, Yicheng and Ak{\c{s}}it, Kaan and Qiu, Simeng},
+  title = {Hologram Representation via Quadratic Phase Gaussian Splatting},
+  booktitle = {SIGGRAPH Asia 2026 Technical Communications (SA Technical Communications '26)},
+  year = {2026},
+  month = {December 01--04},
+  publisher = {Association for Computing Machinery},
+  location = {Kuala Lumpur, Malaysia},
+  pages = {4},
+  isbn = {979-8-4007-2841-9/2026/12},
+  doi = {10.1145/3829339.3847858},
+  url = {https://arxiv.org/abs/2609.11434}
+}</code></pre>
+      </div>
+    </section>
+    <!-- End BibTeX citation -->
+
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="columns is-centered">
+        <div class="column is-8">
+          <div class="content">
+            <p>
+              This page was built using the <a href="https://github.com/eliahuhorwitz/Academic-project-page-template" target="_blank">Academic Project Page Template</a> which was adopted from the <a href="https://nerfies.github.io" target="_blank">Nerfies</a> project page.<br>
+              The template is licensed under <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank">CC BY-SA 4.0</a>.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

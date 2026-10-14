@@ -1,0 +1,346 @@
+/* Based on the Nerfies stylesheet (https://github.com/nerfies/nerfies.github.io, CC BY-SA 4.0).
+   Bulma 0.9.1 and the carousel/slider plugins are the same files Nerfies uses, so sizes, spacing
+   and backgrounds come from Bulma defaults. Additions for this page are at the end. */
+
+body {
+  font-family: 'Noto Sans', sans-serif;
+}
+
+
+.footer .icon-link {
+    font-size: 25px;
+    color: #000;
+}
+
+.link-block a {
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+
+.dnerf {
+  font-variant: small-caps;
+}
+
+
+.teaser .hero-body {
+  padding-top: 0;
+  padding-bottom: 3rem;
+}
+
+.teaser {
+  font-family: 'Google Sans', sans-serif;
+}
+
+
+.publication-title {
+    font-family: 'Google Sans', sans-serif;
+}
+
+.publication-authors {
+    font-family: 'Google Sans', sans-serif;
+}
+
+.publication-venue {
+    color: #555;
+    width: fit-content;
+    font-weight: bold;
+}
+
+.publication-awards {
+    color: #ff3860;
+    width: fit-content;
+    font-weight: bolder;
+}
+
+.publication-authors a {
+   color: hsl(204, 86%, 53%) !important;
+}
+
+.publication-authors a:hover {
+    text-decoration: underline;
+}
+
+.author-block {
+  display: inline-block;
+}
+
+.publication-video {
+    position: relative;
+    width: 100%;
+    height: 0;
+    padding-bottom: 56.25%;
+
+    overflow: hidden;
+    border-radius: 10px !important;
+}
+
+.publication-video iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.results-carousel {
+  overflow: hidden;
+}
+
+.results-carousel .item {
+  margin: 5px;
+  overflow: hidden;
+  border: 1px solid #bbb;
+  border-radius: 10px;
+  padding: 0;
+  font-size: 0;
+}
+
+.results-carousel video {
+  margin: 0;
+}
+
+
+/* ------------------------------------------------------------------------------------------ */
+/* Additions for this page                                                                    */
+/* ------------------------------------------------------------------------------------------ */
+
+/* Uniform spacing between blocks: every block in <main> pads --block-pad above and below,
+   so neighbouring blocks sit 2 x --block-pad apart (Bulma/Nerfies: 3rem + 3rem = 6rem).
+   All blocks are white (no .is-light); only the Bulma footer keeps its #fafafa.
+   !important overrides Bulma's .hero.is-small/.section and the Nerfies .teaser rule above. */
+:root {
+  --block-pad: 1.5rem;
+  --page-edge: 4.5rem;    /* space above the title */
+  --footer-gap: 3rem;     /* extra white space between the last block (BibTeX) and the footer */
+}
+
+main > .section,
+main > .hero > .hero-body,
+main > .hero > .container > .hero-body {
+  padding-top: var(--block-pad) !important;
+  padding-bottom: var(--block-pad) !important;
+}
+
+/* Title block: --page-edge above the title (Bulma default 3rem looked cramped against the top edge).
+   It ends with the link buttons, which carry 0.75rem (.column) + 5px (.link-block a) of space
+   below them; subtract that so the gap to the teaser also equals 2 x --block-pad. */
+main > .hero:first-child > .hero-body {
+  padding-top: var(--page-edge) !important;
+  padding-bottom: calc(var(--block-pad) - 0.75rem - 5px) !important;
+}
+
+/* Footer: Bulma pads it 3rem / 6rem; compact and symmetric so the text sits centred in the grey
+   band, with its own gap above (--footer-gap) instead of changing --block-pad. */
+.footer {
+  margin-top: var(--footer-gap);
+  padding: 2.5rem 1.5rem;   /* 40 px: footer = 128 px with two lines of text */
+}
+
+/* Carousels: fixed display area. Every slide's image/video box has the same aspect ratio and the
+   media is scaled to fit inside it (letterboxed), so the carousel height never changes between
+   slides. Set the ratio per carousel on its element, e.g. style="--slide-aspect: 3150 / 894". */
+.results-carousel {
+  --slide-aspect: 16 / 9;
+}
+
+.results-carousel .item img,
+.results-carousel .item video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: var(--slide-aspect);
+  object-fit: contain;
+  background: #fff;
+}
+
+/* No page dots (index.js: pagination: false); hide the empty container bulma-carousel still adds */
+.results-carousel .slider-pagination {
+  display: none !important;
+}
+
+/* Teaser video layout (its width comes from .train-video below).
+   width/height attributes on the <video> reserve its box before it loads (no layout shift). */
+.teaser video {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0 auto 1rem;
+}
+
+/* Venue highlighted as an outlined tag in a warm orange, so it stands apart from the blue author links
+   (overrides the Nerfies rule above). Text/background contrast is about 5.1:1. */
+.publication-venue {
+  display: inline-block;
+  margin: 0.75rem 0 0.5rem;
+  padding: 0.2rem 0.9rem;
+  font-size: 1rem;
+  color: hsl(20, 85%, 38%);
+  background: hsl(33, 100%, 95%);
+  border: 1.5px solid hsl(25, 95%, 53%);
+  border-radius: 6px;
+}
+
+/* Teaser caption: smaller than Bulma's 1.25rem subtitle */
+.teaser .subtitle {
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+/* Long title: Bulma keeps .is-1 at 3rem on phones; shrink it there */
+@media screen and (max-width: 768px) {
+  .publication-title {
+    font-size: 2.25rem;
+  }
+}
+
+/* BibTeX heading with a copy button (static/js/index.js: copyBibTeX) */
+.bibtex-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.bibtex-header .title {
+  margin-bottom: 0;
+}
+
+.copy-bibtex-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.875rem;
+  color: #363636;
+  background: #f5f5f5;
+  border: 1px solid #dbdbdb;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.copy-bibtex-btn:hover {
+  background: #eeeeee;
+}
+
+.copy-bibtex-btn.copied {
+  color: #fff;
+  background: #48c774;
+  border-color: #48c774;
+}
+
+/* Scroll-to-top button (hidden until the page is scrolled 300 px; static/js/index.js).
+   Kept clear of the window edges; at the page end its centre sits on the footer's centre line
+   (footer 128 px -> centre 64 px from the bottom = 2.625rem offset + half of 2.75rem). */
+.scroll-to-top {
+  position: fixed;
+  right: 2.5rem;
+  bottom: 2.625rem;
+  z-index: 100;
+  width: 2.75rem;
+  height: 2.75rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  color: #fff;
+  background: #363636;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+}
+
+.scroll-to-top.visible {
+  opacity: 0.8;
+  visibility: visible;
+}
+
+.scroll-to-top:hover {
+  opacity: 1;
+}
+
+/* Method / Results: subsection headings, figures, captions, tables */
+.section .title.is-4 {
+  margin-top: 2.5rem;
+}
+
+.section .title.is-3 + .title.is-4 {
+  margin-top: 0;
+}
+
+.figure,
+.method-video {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.figure-caption {
+  margin: 0.5rem 0 1rem;
+  font-size: 0.9rem;
+  color: #666;
+  text-align: center;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.table-container {
+  display: flex;
+  justify-content: center;
+}
+
+.results-table th,
+.results-table td {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+.results-table tr.is-ours td {
+  font-weight: bold;
+}
+
+/* Single-primitive animations (publication/visual): scale each video so its panels are equally tall.
+   Panel height / video width, measured on the 1998 px renders:
+   side view 592/1998 = 0.2963, unit test 778/1998 = 0.3894, shape compare 642/1998 = 0.3213.
+   The side view is the widest at 100%; the others get 0.2963 / ratio of the container width.
+   --qpf-scale shrinks all three together (1 = full width; 0.6 now); phones use full size. */
+:root { --qpf-scale: 0.6; }
+@media screen and (max-width: 768px) { :root { --qpf-scale: 1; } }
+.qpf-side-view     { max-width: calc(90% * var(--qpf-scale)); }
+.freq-figure       { max-width: calc(72% * var(--qpf-scale)); }   /* frequency plot: 0.8x the side view */   /* 0.9x: a bit smaller than the others */
+.qpf-unit-test     { max-width: calc(90% * var(--qpf-scale)); }     /* = side view width: same label size */
+.qpf-shape-compare { max-width: calc(92.2% * var(--qpf-scale)); }
+
+.results-table tr.is-delta td {
+  font-style: italic;
+  color: #666;
+}
+
+/* Carousel slide captions: space between the image and its caption */
+.results-carousel .item .subtitle {
+  margin: 0.75rem 0 0.75rem;
+  font-size: 1rem;   /* Bulma subtitle is 1.25rem */
+}
+
+/* Training videos (teaser + optimization): drawn at the same scale as the side view, so their slider
+   and labels match it. Source widths 3128 vs 1998 px -> 1.5656 x the side view's desktop width
+   (90% of 960 px x --qpf-scale); never wider than their column. */
+.train-video {
+  max-width: min(100%, calc(864px * 1.5656 * var(--qpf-scale)));
+}
+
+/* Tables: a bit smaller than body text */
+.results-table {
+  font-size: 0.875rem;
+}
+
+/* Phones: less margin so the scroll-to-top button does not cover content */
+@media screen and (max-width: 768px) {
+  .scroll-to-top {
+    right: 1.25rem;
+    bottom: 1.25rem;
+  }
+}
