@@ -5,11 +5,11 @@
 [![DOI](https://img.shields.io/badge/DOI-10.1145%2F3829339.3847858-orange?logo=acm)](https://doi.org/10.1145/3829339.3847858)
 [![arXiv](https://img.shields.io/badge/arXiv-2609.11434-b31b1b?logo=arXiv)](https://arxiv.org/abs/2609.11434)
 [![GitHub](https://img.shields.io/badge/GitHub-Code-black?logo=github)](https://github.com/gsmark36/complex-valued-quadratic-phase-gaussian)
-[![Website](https://img.shields.io/badge/Project%20Website-155ECB)]()
+[![Website](https://img.shields.io/badge/Project%20Website-155ECB)](https://gsmark36.github.io/complex-valued-quadratic-phase-gaussian)
 
 **SIGGRAPH Asia 2026 Technical Communications**
 
-[Haolong Wang](https://scholar.google.com/citations?user=_tV0YKkAAAAJ&hl)<sup>1</sup> &emsp; [Yicheng Zhan](https://albertgary.github.io/)<sup>2</sup> &emsp; [Kaan Akşit](https://www.kaanaksit.com/)<sup>2</sup> &emsp; [Simeng Qiu](https://qsimeng.github.io/)<sup>1</sup>
+[Haolong Wang](https://gsmark36.github.io/)<sup>1</sup> &emsp; [Yicheng Zhan](https://albertgary.github.io/)<sup>2</sup> &emsp; [Kaan Akşit](https://www.kaanaksit.com/)<sup>2</sup> &emsp; [Simeng Qiu](https://qsimeng.github.io/)<sup>1</sup>
 
 <sup>1</sup> Swansea University &emsp; <sup>2</sup> University College London (UCL)
 
